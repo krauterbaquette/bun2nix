@@ -5,10 +5,10 @@
   ];
 
   perSystem =
-    { self', ... }:
+    { config, ... }:
     {
       overlayAttrs = {
-        inherit (self'.packages) bun2nix;
+        inherit (config.packages) bun2nix;
       };
     };
 }
