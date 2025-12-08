@@ -35,6 +35,7 @@ in
             nativeBuildInputs ? [ ],
             # Bun binaries built by this derivation become broken by the default fixupPhase
             dontFixup ? !(args ? buildPhase),
+            bunCompileToBytecode ? true,
             ...
           }@args:
 
@@ -115,15 +116,17 @@ in
               if (args ? bunBuildFlags) then
                 args.bunBuildFlags
               else
-                lib.optional (module != null) [
-                  "${module}"
-                  "--outfile"
-                  "${pname}"
-                  "--compile"
-                  "--minify"
-                  "--sourcemap"
-                  "--bytecode"
-                ];
+                lib.optionals (module != null) (
+                  [
+                    "${module}"
+                    "--outfile"
+                    "${pname}"
+                    "--compile"
+                    "--minify"
+                    "--sourcemap"
+                  ]
+                  ++ lib.optional bunCompileToBytecode "--bytecode"
+                );
 
             meta.mainProgram = pname;
 
