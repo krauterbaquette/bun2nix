@@ -10,7 +10,7 @@ use crate::{
     error::{Error, Result},
 };
 
-#[derive(Template, Debug, Serialize, Deserialize, Clone, Eq, Ord, PartialEq, PartialOrd, Hash)]
+#[derive(Debug, Serialize, Deserialize, Clone, Eq, Ord, PartialEq, PartialOrd, Hash, Template)]
 /// # Package Fetcher
 ///
 /// Nix-translated fetcher for a given package
@@ -23,6 +23,8 @@ pub enum Fetcher {
         /// The hash of the downloaded results
         /// This can be derived from the bun lockfile
         hash: String,
+        /// Optional explicit filename (used for non-default registries to ensure .tgz extension)
+        name: Option<String>,
     },
     /// A package which must be retrieved with nix's `pkgs.fetchgit`
     #[template(path = "fetchgit.nix_template")]
@@ -72,19 +74,41 @@ impl Fetcher {
     /// # From NPM Package Name
     ///
     /// Initialize a fetcher from an npm identifier and
-    /// it's hash, optionally using a custom registry path
+    /// it's hash, optionally using an explicit tarball URL
     ///
     /// ## Arguments
     /// * `ident` - The package identifier (e.g., "@types/node@1.0.0")
     /// * `hash` - The integrity hash of the package
-    /// * `registry_path` - Optional registry path from bun.lock. Can be:
-    ///   - None or empty: uses the default npmjs.org registry
-    ///   - Full tarball URL (ends with .tgz): used directly
-    ///   - Base registry URL: package path is appended
-    pub fn new_npm_package(ident: &str, hash: String, registry_path: Option<&str>) -> Result<Self> {
-        let url = Self::to_npm_url(ident, registry_path)?;
+    /// * `tarball_url` - Optional explicit tarball URL from bun.lock. If provided
+    ///   and non-empty, used directly. Otherwise, URL is constructed from the
+    ///   default npmjs.org registry.
+    pub fn new_npm_package(ident: &str, hash: String, tarball_url: Option<&str>) -> Result<Self> {
+        let url = Self::to_npm_url(ident, tarball_url)?;
 
-        Ok(Self::FetchUrl { url, hash })
+        // For non-default registries, explicitly set the filename to ensure .tgz extension
+        let name = if tarball_url.is_some_and(|u| !u.is_empty()) {
+            Some(Self::extract_tgz_filename(ident))
+        } else {
+            None
+        };
+
+        Ok(Self::FetchUrl { url, hash, name })
+    }
+
+    /// Extract a .tgz filename from a package identifier
+    fn extract_tgz_filename(ident: &str) -> String {
+        // Handle scoped packages like @scope/name@version
+        if let Some((_, name_and_ver)) = ident.split_once("/") {
+            if let Some((name, ver)) = name_and_ver.split_once("@") {
+                return format!("{}-{}.tgz", name, ver);
+            }
+        }
+        // Handle unscoped packages like name@version
+        if let Some((name, ver)) = ident.split_once("@") {
+            return format!("{}-{}.tgz", name, ver);
+        }
+        // Fallback
+        format!("{}.tgz", ident)
     }
 
     /// # NPM url converter
@@ -95,7 +119,7 @@ impl Fetcher {
     ///```rust
     /// use bun2nix::package::Fetcher;
     ///
-    /// // Default registry
+    /// // Default registry (empty or None tarball_url)
     /// let npm_identifier = "@alloc/quick-lru@5.2.0";
     ///
     /// assert_eq!(
@@ -103,46 +127,26 @@ impl Fetcher {
     ///     "https://registry.npmjs.org/@alloc/quick-lru/-/quick-lru-5.2.0.tgz"
     /// );
     ///
-    /// // Custom registry (base URL)
     /// assert_eq!(
-    ///     Fetcher::to_npm_url(npm_identifier, Some("https://npm.pkg.github.com/")).unwrap(),
+    ///     Fetcher::to_npm_url(npm_identifier, Some("")).unwrap(),
+    ///     "https://registry.npmjs.org/@alloc/quick-lru/-/quick-lru-5.2.0.tgz"
+    /// );
+    ///
+    /// // Explicit tarball URL (used directly)
+    /// assert_eq!(
+    ///     Fetcher::to_npm_url(npm_identifier, Some("https://npm.pkg.github.com/@alloc/quick-lru/-/quick-lru-5.2.0.tgz")).unwrap(),
     ///     "https://npm.pkg.github.com/@alloc/quick-lru/-/quick-lru-5.2.0.tgz"
     /// );
-    ///
-    /// // Unscoped package with custom registry
-    /// assert_eq!(
-    ///     Fetcher::to_npm_url("lodash@4.17.21", Some("https://npm.example.com")).unwrap(),
-    ///     "https://npm.example.com/lodash/-/lodash-4.17.21.tgz"
-    /// );
-    ///
-    /// // Full tarball URL (used directly)
-    /// assert_eq!(
-    ///     Fetcher::to_npm_url("lodash@4.17.21", Some("https://npm.pkg.github.com/lodash/-/lodash-4.17.21.tgz")).unwrap(),
-    ///     "https://npm.pkg.github.com/lodash/-/lodash-4.17.21.tgz"
-    /// );
     /// ```
-    pub fn to_npm_url(ident: &str, registry_path: Option<&str>) -> Result<String> {
-        // If registry_path is a full tarball URL, use it directly
-        if let Some(path) = registry_path {
-            if !path.is_empty() && path.ends_with(".tgz") {
-                return Ok(path.to_string());
+    pub fn to_npm_url(ident: &str, tarball_url: Option<&str>) -> Result<String> {
+        // If an explicit tarball URL is provided, use it directly
+        if let Some(url) = tarball_url {
+            if !url.is_empty() {
+                return Ok(url.to_string());
             }
         }
 
-        // Determine the base registry URL
-        let base_url = match registry_path {
-            Some(url) if !url.is_empty() => {
-                // Ensure the registry URL ends with a slash
-                if url.ends_with('/') {
-                    url.to_string()
-                } else {
-                    format!("{}/", url)
-                }
-            }
-            _ => DEFAULT_REGISTRY.to_string(),
-        };
-
-        // Construct the tarball URL from the package identifier
+        // Otherwise, construct the URL from the default registry
         let Some((user, name_and_ver)) = ident.split_once("/") else {
             let Some((name, ver)) = ident.split_once("@") else {
                 return Err(Error::NoAtInPackageIdentifier);
@@ -150,7 +154,7 @@ impl Fetcher {
 
             return Ok(format!(
                 "{}{}/-/{}-{}.tgz",
-                base_url, name, name, ver
+                DEFAULT_REGISTRY, name, name, ver
             ));
         };
 
@@ -160,7 +164,7 @@ impl Fetcher {
 
         Ok(format!(
             "{}{}/{}/-/{}-{}.tgz",
-            base_url, user, name, name, ver
+            DEFAULT_REGISTRY, user, name, name, ver
         ))
     }
 }

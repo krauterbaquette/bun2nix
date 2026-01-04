@@ -59,11 +59,11 @@ let
         # Parse a line like //npm.pkg.github.com/:_authToken=TOKEN
         parseLine = line:
           let
-            match = builtins.match "^//([^/]+)(/.*)/:_authToken=(.+)$" line;
+            match = builtins.match "^//([^/]+)/:_authToken=(.+)$" line;
           in
             if match != null then {
-              url = "https://${builtins.elemAt match 0}${builtins.elemAt match 1}";
-              token = builtins.elemAt match 2;
+              url = "https://${builtins.elemAt match 0}";
+              token = builtins.elemAt match 1;
             }
             else null;
         parsed = builtins.filter (x: x != null) (builtins.map parseLine lines);

@@ -44,27 +44,27 @@ impl PackageDeserializer {
     /// Deserialize an npm package from it's bun lockfile representation
     ///
     /// This is found in the source as a tuple of arity 4:
-    /// `[identifier, registry, metadata, hash]`
+    /// `[identifier, tarball_url, metadata, hash]`
     ///
-    /// The registry field is empty for the default registry (registry.npmjs.org),
-    /// or contains a custom registry URL (e.g., "https://npm.pkg.github.com/")
+    /// The tarball_url field is empty for the default registry (registry.npmjs.org),
+    /// or contains the exact URL to the package tarball for non-default registries.
     pub fn deserialize_npm_package(mut self) -> Result<Package> {
         // The bun.lock format for npm packages is:
-        // [identifier, registry, metadata, hash]
+        // [identifier, tarball_url, metadata, hash]
         // - identifier: "name@version"
-        // - registry: "" for default, or custom registry URL
+        // - tarball_url: "" for default registry, or exact URL to tarball
         // - metadata: object with dependencies, bin, etc.
         // - hash: integrity hash (sha512-...)
 
         let npm_identifier_raw = swap_remove_value(&mut self.values, 0);
-        // After swap_remove(0): [hash, registry, meta]
+        // After swap_remove(0): [hash, tarball_url, meta]
 
         let hash = swap_remove_value(&mut self.values, 0);
-        // After swap_remove(0): [meta, registry]
+        // After swap_remove(0): [meta, tarball_url]
 
-        // Get the registry URL from what's now at index 1
+        // Get the tarball URL from what's now at index 1
         // (originally at index 1, but the metadata swapped in at index 0)
-        let registry = self
+        let tarball_url = self
             .values
             .get(1)
             .and_then(|v| v.as_str())
@@ -75,7 +75,7 @@ impl PackageDeserializer {
             "Expected hash to be in sri format and contain sha512"
         );
 
-        let fetcher = Fetcher::new_npm_package(&npm_identifier_raw, hash, registry)?;
+        let fetcher = Fetcher::new_npm_package(&npm_identifier_raw, hash, tarball_url)?;
 
         Ok(Package::new(npm_identifier_raw, fetcher))
     }
