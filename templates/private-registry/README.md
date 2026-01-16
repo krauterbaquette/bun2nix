@@ -10,7 +10,7 @@ provide authentication credentials. bun2nix supports two methods for configuring
 registry credentials:
 
 1. **bunfig.toml** - Bun's native configuration file
-2. **.npmrc** - Standard npm configuration file
+1. **.npmrc** - Standard npm configuration file
 
 ## Setup
 
@@ -67,12 +67,12 @@ bun2nix.mkDerivation {
 1. When `bun2nix` generates `bun.nix`, it extracts the full tarball URLs from
    `bun.lock` for packages from non-default registries.
 
-2. When `fetchBunDeps` evaluates, it:
+1. When `fetchBunDeps` evaluates, it:
    - Parses credentials from the provided config files
    - Creates an authenticated `fetchurl` wrapper that adds `Authorization`
      headers for matching registry hosts
 
-3. Packages from default registry (registry.npmjs.org) work without credentials.
+1. Packages from default registry (registry.npmjs.org) work without credentials.
 
 ## Files in this Template
 
@@ -87,8 +87,8 @@ bun2nix.mkDerivation {
 To test with your own private registry:
 
 1. Update `bunfig.toml` with your registry URL and scope
-2. Add a dependency from your private registry to `package.json`
-3. Set up authentication (e.g., `export GITHUB_TOKEN=...`)
-4. Run `bun install` to update `bun.lock`
-5. Run `bun2nix -o bun.nix` to regenerate the nix file
-6. Build with `nix build`
+1. Add a dependency from your private registry to `package.json`
+1. Set up authentication (e.g., `export GITHUB_TOKEN=...`)
+1. Run `bun install` to update `bun.lock`
+1. Run `bun2nix -o bun.nix` to regenerate the nix file
+1. Build with `nix build`
