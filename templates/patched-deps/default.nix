@@ -6,11 +6,9 @@
 let
   packageJsonPath = ./package.json;
   packageJsonContents = lib.importJSON packageJsonPath;
-  # Convert relative path strings from package.json to Nix paths
   patchedDependencies = lib.mapAttrs (_: path: ./. + "/${path}") (
     packageJsonContents.patchedDependencies or { }
   );
-  # Convert patchedDependencies to overrides using the helper function
   patchOverrides = bun2nix.patchedDependenciesToOverrides {
     inherit patchedDependencies;
   };
