@@ -14,9 +14,6 @@ in
         Helper function that converts a `patchedDependencies` attribute set
         into a valid `overrides` set for use with `fetchBunDeps`.
 
-        This allows using Bun's `patchedDependencies` feature from package.json
-        while leveraging the existing overrides API.
-
         # Example
 
         ```nix
