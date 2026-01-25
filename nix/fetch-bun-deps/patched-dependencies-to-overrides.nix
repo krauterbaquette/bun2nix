@@ -13,14 +13,14 @@ in
       description = ''
         Helper function that converts a `patchedDependencies` attribute set
         into a valid `overrides` set for use with `fetchBunDeps`.
-
-        # Example
-
-        ```nix
+      '';
+      type = types.functionTo types.attrs;
+      example = lib.literalExpression ''
         let
+          src = ./.;
           packageJsonPath = ./package.json;
           packageJsonContents = lib.importJSON packageJsonPath;
-          patchedDependencies = lib.mapAttrs (_: path: ./. + "/''${path}") (
+          patchedDependencies = lib.mapAttrs (_: path: "''${src}/''${path}") (
             packageJsonContents.patchedDependencies or { }
           );
           patchOverrides = bun2nix.patchedDependenciesToOverrides {
@@ -31,9 +31,7 @@ in
           bunNix = ./bun.nix;
           overrides = patchOverrides;
         }
-        ```
       '';
-      type = types.functionTo types.attrs;
     };
   };
 

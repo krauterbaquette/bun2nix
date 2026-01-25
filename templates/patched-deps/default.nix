@@ -4,9 +4,10 @@
   ...
 }:
 let
+  src = ./.;
   packageJsonPath = ./package.json;
   packageJsonContents = lib.importJSON packageJsonPath;
-  patchedDependencies = lib.mapAttrs (_: path: ./. + "/${path}") (
+  patchedDependencies = lib.mapAttrs (_: path: "${src}/${path}") (
     packageJsonContents.patchedDependencies or { }
   );
   patchOverrides = bun2nix.patchedDependenciesToOverrides {
@@ -16,7 +17,7 @@ in
 bun2nix.mkDerivation {
   packageJson = packageJsonPath;
 
-  src = ./.;
+  inherit src;
 
   bunDeps = bun2nix.fetchBunDeps {
     bunNix = ./bun.nix;
