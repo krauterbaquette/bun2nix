@@ -1,5 +1,4 @@
 {
-  lib,
   config,
   ...
 }:
@@ -9,6 +8,9 @@ in
 {
   perSystem =
     { pkgs, config, ... }:
+    let
+      inherit (pkgs) lib;
+    in
     {
       packages = rec {
         bun2nix = pkgs.rustPlatform.buildRustPackage (
