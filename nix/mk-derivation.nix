@@ -36,6 +36,7 @@ in
             # Bun binaries built by this derivation become broken by the default fixupPhase
             dontFixup ? !(args ? buildPhase),
             bunCompileToBytecode ? true,
+            bunCompileToESM ? false,
             ...
           }@args:
 
@@ -83,6 +84,14 @@ in
             pname = args.pname or package.name or null;
             version = args.version or package.version or null;
             module = args.module or package.module or null;
+            inferedCompileToESM =
+              # ESM compilation was introcued in bun v1.3.9
+              # see https://bun.com/blog/bun-v1.3.9#esm-bytecode-in-compile
+              (builtins.compareVersions pkgs.bun.version "1.3.9" >= 0)
+              # infer bytecode compilation type from packageJSON
+              && (packageJson != null)
+              && packageJson ? type
+              && packageJson.type == "module";
           in
 
           assert lib.assertMsg (pname != null) ''
@@ -102,6 +111,13 @@ in
             ${pkgJsonContents}
             ```
           '';
+
+          assert lib.assertMsg (bunCompileToESM && (builtins.compareVersions pkgs.bun.version "1.3.9") == -1)
+            ''
+              bun2nix.mkDerivation: Compiling to ESM bytecode is only supported from bun version >= 1.3.9.
+
+              You are compile with: bun v${pkgs.bun.version}
+            '';
           {
             inherit
               pname
@@ -126,6 +142,7 @@ in
                     "--sourcemap"
                   ]
                   ++ lib.optional bunCompileToBytecode "--bytecode"
+                  ++ lib.optional (bunCompileToESM || inferedCompileToESM) "--format=esm"
                 );
 
             meta.mainProgram = pname;
